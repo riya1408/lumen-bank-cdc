@@ -1,5 +1,8 @@
 # Lumen Bank: Real-time Customer 360 with Oracle CDC
 
+**Live demo:** https://lumen-dashboard-682652351786.asia-south1.run.app
+(Runs on Google Cloud Run and scales to zero, so the first load may take a few seconds.)
+
 A simulated bank whose Oracle core system streams every change through **Debezium** and **Kafka** into a live **Customer 360** in **MongoDB Atlas**, with real-time spend profiles and fraud alerts, shown on a **Streamlit** dashboard. The whole stack starts with one command.
 
 ![Demo: a fraud scenario in Oracle (right) raises an alert on the dashboard (left) on its own](docs/demo.gif)
