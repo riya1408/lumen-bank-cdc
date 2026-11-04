@@ -22,6 +22,10 @@ resource "google_artifact_registry_repository" "lumen" {
       older_than = "86400s"
     }
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # The dashboard's own identity
@@ -35,6 +39,10 @@ resource "google_secret_manager_secret" "mongo_uri" {
   secret_id = "mongo-uri"
   replication {
     auto {}
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
