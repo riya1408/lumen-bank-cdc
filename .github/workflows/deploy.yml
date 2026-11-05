@@ -1,0 +1,47 @@
+name: Deploy dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - dashboard.py
+      - Dockerfile
+      - requirements-dashboard.txt
+      - .github/workflows/deploy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: asia-south1
+  IMAGE: asia-south1-docker.pkg.dev/lumen-bank-cdc/lumen/dashboard
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Log in to Google Cloud (no key file)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/682652351786/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-deployer@lumen-bank-cdc.iam.gserviceaccount.com
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Let Docker push to Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build image (tagged with the commit ID)
+        run: docker build -t ${{ env.IMAGE }}:${{ github.sha }} .
+
+      - name: Push image
+        run: docker push ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        run: gcloud run deploy lumen-dashboard --image=${{ env.IMAGE }}:${{ github.sha }} --region=${{ env.REGION }} --quiet
