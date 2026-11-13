@@ -97,9 +97,6 @@ def build_all():
 
 
 def ensure_index():
-    if any(ix["name"] == INDEX_NAME for ix in customers.list_search_indexes()):
-        print(f"Index '{INDEX_NAME}' already exists")
-        return
     definition = {"fields": [
         {"type": "autoEmbed", "modality": "text", "path": "profile_text", "model": MODEL},
         {"type": "filter", "path": "segment"},
@@ -107,14 +104,25 @@ def ensure_index():
         {"type": "filter", "path": "risk_tier"},
         {"type": "filter", "path": "kyc_status"},
         {"type": "filter", "path": "_deleted"},
+        {"type": "filter", "path": "_id"},          # lets the live worker score only changed customers
     ]}
-    customers.create_search_index(SearchIndexModel(definition=definition, name=INDEX_NAME, type="vectorSearch"))
-    print(f"Creating index '{INDEX_NAME}' ...")
+    existing = next((ix for ix in customers.list_search_indexes() if ix["name"] == INDEX_NAME), None)
+    if existing is None:
+        customers.create_search_index(SearchIndexModel(definition=definition, name=INDEX_NAME, type="vectorSearch"))
+        print(f"Creating index '{INDEX_NAME}' ...")
+    else:
+        paths = {f.get("path") for f in existing.get("latestDefinition", {}).get("fields", [])}
+        if "_id" in paths:
+            print(f"Index '{INDEX_NAME}' is up to date")
+            return
+        customers.update_search_index(INDEX_NAME, definition)
+        print(f"Updating index '{INDEX_NAME}' (adding the _id filter) ...")
+        time.sleep(10)
     start = time.time()
     while time.time() - start < 900:
         ix = next((i for i in customers.list_search_indexes() if i["name"] == INDEX_NAME), {})
-        if ix.get("queryable"):
-            print(f"Index queryable after {int(time.time() - start)} s")
+        if ix.get("queryable") and ix.get("status") == "READY":
+            print(f"Index ready after {int(time.time() - start)} s")
             return
         print(f"  waiting... status={ix.get('status')}")
         time.sleep(20)

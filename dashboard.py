@@ -1,7 +1,8 @@
 """Lumen Bank (fictional) - live Customer 360 dashboard.
 
-Reads the MongoDB collections maintained by consumer_360.py:
-  customer_360   one document per customer (profile, accounts, derived fields, alerts)
+Reads the MongoDB collections maintained by consumer_360.py and the recommendation jobs:
+  customer_360   one document per customer (profile, accounts, derived fields, alerts,
+                 product recommendations)
   transactions   recent transactions (90-day hot window)
 """
 import datetime as dt
@@ -188,6 +189,24 @@ with tab_customer:
 
         for a in live_alerts(doc.get("alerts", [])):
             st.error(f"🚨 {a['detail']} - {', '.join(a['cities'])} - {inr(a['total'])} ({ago(a['detected_at'])})")
+
+        st.markdown("**Recommended for you**")
+        recs = doc.get("recommendations")
+        if kyc != "VERIFIED":
+            st.caption("No offers: every Lumen Bank product requires verified KYC.")
+        elif recs:
+            for col, r in zip(st.columns(len(recs)), recs):
+                top = max(1, round((1 - r["percentile"]) * 100))
+                col.metric(r["name"], f"Top {top}%",
+                           help=f"Fits this product better than {round(r['percentile'] * 100)}% of the "
+                                f"customers eligible for it (similarity {r['score']}).")
+            st.caption(f"Based on: *{doc.get('profile_text', '')}*  ·  updated {ago(doc.get('recs_computed_at'))} "
+                       f"({doc.get('recs_mode', 'full')} refresh, {doc.get('recs_model', '')})")
+        elif recs is None:
+            st.caption("Recommendations not computed yet. Run: python refresh_recommendations.py")
+        else:
+            st.caption("No product fits well enough yet (a customer must be in the top half of a product's "
+                       "eligible customers).")
 
         left, right = st.columns([3, 2])
         with left:
